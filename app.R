@@ -16,6 +16,8 @@ server<-function(input, output) {
     bins <- seq(min(x), max(x), length.out = input$num + 1)
     hist(x, breaks = bins, col = 'darkgray', border = 'white')
   })
+  fileInput("file", "upload data")
+  
 }
 
 
