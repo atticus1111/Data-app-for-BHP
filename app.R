@@ -1,78 +1,101 @@
 library(shiny)
 library(bslib)
+library(reticulate)
 
-# features that I want: 
-# - file upload for the excell documents, ideally could just read from the excell folder
-# directly 
-# - a data display of uploaded data, tracking rates, maxes, averages, costs,
+use_python(
+  "/usr/bin/python3",
+  required = TRUE
+)
 
+source_python("~/Documents/Computing/Future City/Data-app-for-BHP/file_convert_.py")
 
-
-# define UI
-ui <- page_fluid( 
-  title ="BHP dashboard",
-
+ui <- page_fluid(
+  
+  title = "BHP Dashboard",
+  
   layout_sidebar(
     
-    sidebar = sidebar("controlls",
-                      position = "left",
-                      
-                      card(
-                        card_header("File Folder Selecter"),
-                        fileInput("foler_in_",
-                                  label ="Input folder: "
-                        )
-                      ),
-                      card(
-                        card_header("Individual File Selector"),
-                        fileInput("file_in_",
-                                  label = "Input File:"
-                        )
-                      ),
-                      card(
-                        card_header("Graph controlls"),
-                        radioButtons(inputId = "controlls_",
-                                     label = "cont",
-                          choices = c( "1", "2", "3")  )
-                        ),
-                      card(
-                        card_header("Graph Sliders"),
-                        sliderInput("date_",
-                                    label = "date range:",
-                                    min=0,
-                                    max= 100,
-                                    value = c(50,75)
-                        )
-                      )
+    sidebar = sidebar(
+      
+      "controls",
+      
+      position = "left",
+      
+      card(
+        card_header("Individual File Selector"),
+        
+        fileInput(
+          "file_in_",
+          label = "Manual Input File:",
+          accept = c(".pdf")
+        )
+      ),
+      
+      card(
+        card_header("Table Selector"),
+        
+        sliderInput(
+          "table_num_",
+          label = "Table Number",
+          min = 1,
+          max = 20,
+          value = 1
+        )
+      )
+      
     ),
-    card(
-      card_header("Analyitics"),
-      textOutput("selection_")
-    )
-  )
-
-  )
-
-
-
-# define Server function
-server<-function(input, output) {
-
-  
-  output$selection_ <- renderText({
     
-    switch(
-      input$controlls_,
-      "1" = paste("你的書", input$controlls_),
-      "2" = paste("your book", input$controlls_),
-      "3" = paste("tu libro", input$controlls_)
+    card(
+      
+      card_header("Analytics"),
+      
+      textOutput("selection_"),
+      
+      tableOutput("data_1")
+      
+    )
+    
+  )
+  
+)
+
+server <- function(input, output) {
+  
+  pdf_data <- reactive({
+    
+    req(input$file_in_)
+    
+    extract_tables_to_json(
+      input$file_in_$datapath
     )
     
   })
   
-
-
+  output$selection_ <- renderText({
+    
+    req(pdf_data())
+    
+    paste(
+      "Tables found:",
+      pdf_data()$total_tables
+    )
+    
+  })
+  
+  output$data_1 <- renderTable({
+    
+    req(pdf_data())
+    
+    idx <- input$table_num_
+    
+    req(
+      idx <= length(pdf_data()$tables)
+    )
+    
+    pdf_data()$tables[[idx]]$data
+    
+  })
+  
 }
 
-# runs app
-shinyApp(ui=ui, server=server)
+shinyApp(ui, server)
