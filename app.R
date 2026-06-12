@@ -8,32 +8,71 @@ library(bslib)
 
 
 
+# define UI
+ui <- page_fluid( 
+  title ="BHP dashboard",
 
-ui <- page_sidebar(
-  title ="hello",
-  sidebar=sidebar(
-    sliderInput("num", "Number of bins:", 1, 50, 30)
-  ),
-  plotOutput("distPlot"),
-  fileInput("file", "upload data"),
-  textInput("text", "Enter text:"),
-  renderText("text")
+  layout_sidebar(
+    
+    sidebar = sidebar("controlls",
+                      position = "left",
+                      
+                      card(
+                        card_header("File Folder Selecter"),
+                        fileInput("foler_in_",
+                                  label ="Input folder: "
+                        )
+                      ),
+                      card(
+                        card_header("Individual File Selector"),
+                        fileInput("file_in_",
+                                  label = "Input File:"
+                        )
+                      ),
+                      card(
+                        card_header("Graph controlls"),
+                        radioButtons(inputId = "controlls_",
+                                     label = "cont",
+                          choices = c( "1", "2", "3")  )
+                        ),
+                      card(
+                        card_header("Graph Sliders"),
+                        sliderInput("date_",
+                                    label = "date range:",
+                                    min=0,
+                                    max= 100,
+                                    value = c(50,75)
+                        )
+                      )
+    ),
+    card(
+      card_header("Analyitics"),
+      textOutput("selection_")
+    )
+  )
+
+  )
 
 
-)
 
+# define Server function
 server<-function(input, output) {
-  output$distPlot <- renderPlot({
-    x    <- faithful[, 2] 
-    bins <- seq(min(x), max(x), length.out = input$num + 1)
-    hist(x, breaks = bins, col = 'darkgray', border = 'white')
-  })
- 
 
+  
+  output$selection_ <- renderText({
+    
+    switch(
+      input$controlls_,
+      "1" = paste("你的書", input$controlls_),
+      "2" = paste("your book", input$controlls_),
+      "3" = paste("tu libro", input$controlls_)
+    )
+    
+  })
   
 
 
 }
 
-
+# runs app
 shinyApp(ui=ui, server=server)
