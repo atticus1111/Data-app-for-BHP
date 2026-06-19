@@ -1,64 +1,109 @@
 library(shiny)
 library(bslib)
 library(reticulate)
+library(DT)
+library(shinydashboard)
+library(ggplot2)
+
+# state: changed ui to dashboard style to look better, hoping that each tab could be a
+# differnt property in the end. I took G's data from excell and converted to a csv
+# not quite sure what to do with the data yet beause this requires new methods of graphing and analysis 
+# than I am used too. The issue i see right now is that I want to select the data based on its row
+# but the rownames aren't really loading in how I want. 
+# will see about this later, maybe data needs to be manipulated to better deal with its format. 
+
+
 
 use_python(
   "/usr/bin/python3",
   required = TRUE
 )
 
+file_1<-read.csv("~/Documents/Computing/Future City/Data-app-for-BHP/Book1.csv")
+
+
 source_python("~/Documents/Computing/Future City/Data-app-for-BHP/file_convert_.py")
 
-ui <- page_fluid(
+header <- dashboardHeader(
+  title = "BHP Dashboard"
+)
+
+sidebar <- dashboardSidebar(
+  sidebarMenu(menuItem("Dashboard", tabName = "dashboard", icon = icon("dashboard")),
+              menuItem("Widgets", icon = icon("th"), tabName = "widgets",
+                       badgeLabel = "new", badgeColor = "green")
+  ))
+
+
+
+  tab1<-tabItem(
+    tabName = "dashboard",
+    h2("Dashboard tab content")
+  )
   
-  title = "BHP Dashboard",
-  
-  layout_sidebar(
+  tab2 <- tabItem(
     
-    sidebar = sidebar(
+    tabName = "widgets",
+    
+    h2("Widgets tab content"),
+    
+    box(
       
-      "controls",
+      title = "Individual File Selector",
       
-      position = "left",
-      
-      card(
-        card_header("Individual File Selector"),
-        
-        fileInput(
-          "file_in_",
-          label = "Manual Input File:",
-          accept = c(".pdf")
-        )
-      ),
-      
-      card(
-        card_header("Table Selector"),
-        
-        sliderInput(
-          "table_num_",
-          label = "Table Number",
-          min = 1,
-          max = 20,
-          value = 1
-        )
+      fileInput(
+        "file_in_",
+        label = "Manual Input File:",
+        accept = c(".pdf")
       )
       
     ),
     
-    card(
+    box(
       
-      card_header("Analytics"),
+      title = "Table Selector",
       
-      textOutput("selection_"),
+      sliderInput(
+        "table_num_",
+        label = "Table Number",
+        min = 1,
+        max = 20,
+        value = 1
+      )
       
-      tableOutput("data_1")
+    ),
+    
+    box(
       
-    )
+      title = "Table Information",
+      
+      textOutput("selection_")
+      
+    ),
+    
+    box(
+      
+      title = "Extracted Table",
+      
+      DTOutput("data_1")
+      
+    ),
+    plotOutput("graph_")
     
   )
-  
-)
 
+ui <- dashboardPage(
+   header,
+   sidebar,
+   dashboardBody(
+     tabItems(
+    tab1,
+    tab2
+     )
+   )
+)
+ 
+ 
 server <- function(input, output) {
   
   pdf_data <- reactive({
@@ -82,20 +127,30 @@ server <- function(input, output) {
     
   })
   
-  output$data_1 <- renderTable({
+  output$data_1 <- renderDT({
     
     req(pdf_data())
     
     idx <- input$table_num_
     
-    req(
-      idx <= length(pdf_data()$tables)
-    )
+    req(idx <= length(pdf_data()$tables))
     
-    pdf_data()$tables[[idx]]$data
+    as.data.frame(
+      pdf_data()$tables[[idx]]$data
+    )
     
   })
   
+
+  
+  output$graph_<-renderPlot({
+    ggplot(file_1,
+           aes(x=`Description`, y=`Subtotal`))+
+      geom_point()
+    
+  })
 }
+  
+
 
 shinyApp(ui, server)
