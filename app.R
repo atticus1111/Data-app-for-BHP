@@ -29,67 +29,33 @@ header <- dashboardHeader(
 )
 
 sidebar <- dashboardSidebar(
-  sidebarMenu(menuItem("Dashboard", tabName = "dashboard", icon = icon("dashboard")),
-              menuItem("Widgets", icon = icon("th"), tabName = "widgets",
-                       badgeLabel = "new", badgeColor = "green")
+  sidebarMenu(menuItem("File Input", tabName = "file_input", icon = icon("dashboard")),
+              menuItem("Golden West", icon = icon("th"), tabName = "GW_data")
   ))
 
 
 
   tab1<-tabItem(
-    tabName = "dashboard",
-    h2("Dashboard tab content")
+    tabName = "file_input",
+    h2("File Inputs and Selector"),
+    
   )
   
   tab2 <- tabItem(
     
-    tabName = "widgets",
+    tabName = "GW_data",
     
     h2("Widgets tab content"),
     
     box(
       
-      title = "Individual File Selector",
+      title = "Golden West Data (Apr 25 - May 26)",
       
-      fileInput(
-        "file_in_",
-        label = "Manual Input File:",
-        accept = c(".pdf")
-      )
-      
-    ),
+    plotOutput("graph_"),
     
-    box(
-      
-      title = "Table Selector",
-      
-      sliderInput(
-        "table_num_",
-        label = "Table Number",
-        min = 1,
-        max = 20,
-        value = 1
-      )
-      
-    ),
+    textOutput("out_")
     
-    box(
-      
-      title = "Table Information",
-      
-      textOutput("selection_")
-      
-    ),
-    
-    box(
-      
-      title = "Extracted Table",
-      
-      DTOutput("data_1")
-      
-    ),
-    plotOutput("graph_")
-    
+    )
   )
 
 ui <- dashboardPage(
@@ -127,6 +93,9 @@ server <- function(input, output) {
     
   })
   
+  
+ 
+  
   output$data_1 <- renderDT({
     
     req(pdf_data())
@@ -141,16 +110,31 @@ server <- function(input, output) {
     
   })
   
-
+  # renaming columns so they are in a date format
+  for (i in 2:(ncol(file_1))){
+    n <- colnames(file_1)[i]
+    n<- gsub("^X","",n)
+    m<-as.Date(n, format="%m.%d.%Y")
+    if(!is.na(m)) {
+      colnames(file_1)[i] <- as.character(m)
+    }   
+  }
+  # 3 extra cols added at end for some reason, this dropps
+  
+  file_1<-file_1 %>% 
+    subset(select=-c(14:16)) 
   
   output$graph_<-renderPlot({
     ggplot(file_1,
            aes(x=`Description`, y=`Subtotal`))+
-      geom_point()
-    
+      geom_area()
+    #we want a stacked area chart for this
   })
+  
+  output$out_ <- renderText({
+    names (file_1)
+  })
+  
 }
   
-
-
 shinyApp(ui, server)
