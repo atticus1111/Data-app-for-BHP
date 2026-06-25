@@ -1,0 +1,167 @@
+#
+# Natural Gas Bill Analysis - Shiny App
+# Reads billing data directly from a CSV hosted on GitHub
+#
+
+library(shiny)
+library(bslib)
+library(dplyr)
+library(tidyr)
+library(readr)
+library(lubridate)
+library(ggplot2)
+
+# ---- 1. SET YOUR GITHUB RAW CSV URL HERE ----
+csv_url <- "https://raw.githubusercontent.com/atticus1111/Data-app-for-BHP/refs/heads/main/Book1.csv"
+
+# ---- 2. Load + reshape the data ----
+load_gas_data <- function(url) {
+  raw <- read_csv(url, show_col_types = FALSE)
+
+  # --- Diagnostics: print what was actually loaded ---
+  cat("\n--- DEBUG: column names found ---\n")
+  print(names(raw))
+  cat("--- DEBUG: first 3 rows ---\n")
+  print(head(raw, 3))
+
+  # Drop fully empty / unnamed trailing columns (your file has a few blank ones)
+  raw <- raw %>% select(where(~ !all(is.na(.))))
+  raw <- raw[, !grepl("^\\.\\.\\.|^$|^NA$", names(raw))]
+
+  # Find the description column robustly (case/whitespace-insensitive)
+  desc_col <- names(raw)[trimws(tolower(names(raw))) == "description"]
+  if (length(desc_col) == 0) {
+    stop(
+      "Could not find a 'Description' column. Columns found were: ",
+      paste(names(raw), collapse = ", ")
+    )
+  }
+  desc_col <- desc_col[1]
+  names(raw)[names(raw) == desc_col] <- "Description"
+
+  # Identify date columns (everything except "Description")
+  date_cols <- setdiff(names(raw), "Description")
+
+  # Pivot to long format: one row per Description per billing date
+  long_data <- raw %>%
+    pivot_longer(
+      cols = all_of(date_cols),
+      names_to = "bill_date",
+      values_to = "value"
+    ) %>%
+    filter(!is.na(value)) %>%
+    mutate(
+      bill_date = mdy(trimws(bill_date)),
+      value = suppressWarnings(as.numeric(value))
+    ) %>%
+    filter(!is.na(bill_date), !is.na(value))
+
+  if (nrow(long_data) == 0) {
+    stop("Data loaded but ended up empty after cleaning. Check the DEBUG output above for clues.")
+  }
+
+  long_data
+}
+
+gas_data <- load_gas_data(csv_url)
+
+# Charge categories (rows) available for selection
+charge_types <- gas_data %>%
+  filter(!Description %in% c("Usage Units", "Capacity Units")) %>%
+  distinct(Description) %>%
+  pull(Description)
+
+# ---- UI ----
+ui <- fluidPage(
+  theme = bs_theme(version = 5),
+
+  titlePanel("Natural Gas Bill Analysis"),
+
+  sidebarLayout(
+    sidebarPanel(
+      selectInput(
+        "charges",
+        "Select charge type(s):",
+        choices = charge_types,
+        selected = c("Total", "Usage Charge", "Capacity Charge"),
+        multiple = TRUE
+      ),
+      dateRangeInput(
+        "date_range",
+        "Date range:",
+        start = min(gas_data$bill_date, na.rm = TRUE),
+        end = max(gas_data$bill_date, na.rm = TRUE)
+      ),
+      hr(),
+      helpText("Data source: billing CSV pulled live from GitHub.")
+    ),
+
+    mainPanel(
+      tabsetPanel(
+        tabPanel(
+          "Trends",
+          plotOutput("trendPlot", height = "400px")
+        ),
+        tabPanel(
+          "Summary",
+          tableOutput("summaryTable")
+        ),
+        tabPanel(
+          "Raw data",
+          tableOutput("rawTable")
+        )
+      )
+    )
+  )
+)
+
+# ---- Server ----
+server <- function(input, output, session) {
+
+  filtered_data <- reactive({
+    gas_data %>%
+      filter(
+        Description %in% input$charges,
+        bill_date >= input$date_range[1],
+        bill_date <= input$date_range[2]
+      )
+  })
+
+  output$trendPlot <- renderPlot({
+    df <- filtered_data()
+    validate(need(nrow(df) > 0, "No data for the selected charges/date range."))
+
+    ggplot(df, aes(x = bill_date, y = value, color = Description)) +
+      geom_line(linewidth = 1) +
+      geom_point(size = 2) +
+      labs(
+        x = "Billing date",
+        y = "Amount ($)",
+        color = "Charge type",
+        title = "Charges over time"
+      ) +
+      theme_minimal(base_size = 14)
+  })
+
+  output$summaryTable <- renderTable({
+    df <- filtered_data()
+    df %>%
+      group_by(Description) %>%
+      summarise(
+        Min = round(min(value, na.rm = TRUE), 2),
+        Max = round(max(value, na.rm = TRUE), 2),
+        Average = round(mean(value, na.rm = TRUE), 2),
+        Total = round(sum(value, na.rm = TRUE), 2),
+        .groups = "drop"
+      )
+  })
+
+  output$rawTable <- renderTable({
+    filtered_data() %>%
+      arrange(bill_date, Description) %>%
+      mutate(bill_date = format(bill_date, "%m/%d/%Y"))
+  })
+}
+
+# Run the application
+shinyApp(ui = ui, server = server)
