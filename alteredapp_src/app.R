@@ -211,9 +211,6 @@ ui <- fluidPage(
         start = min(gas_data$bill_date, na.rm = TRUE),
         end = max(gas_data$bill_date, na.rm = TRUE)
       ),
-      hr(),
-      helpText("Data source: billing CSV pulled live from GitHub."),
-      hr(),
       fileInput(
         "pdf_upload",
         "Upload a bill PDF:",
