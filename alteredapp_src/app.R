@@ -14,7 +14,7 @@ library(pdftools)
 library(stringr)
 
 # ---- 1. SET YOUR GITHUB RAW CSV URL HERE ----
-csv_url <- "https://github.com/atticus1111/Data-app-for-BHP/blob/main/phpdata.csv"
+csv_url <- "https://raw.githubusercontent.com/atticus1111/Data-app-for-BHP/blob/main/phpdata.csv"
 
 # ---- 2. Load + reshape the data ----
 load_gas_data <- function(url) {
