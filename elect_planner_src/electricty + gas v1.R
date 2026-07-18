@@ -128,7 +128,7 @@ elec_patterns <- c(
   "Elec Franchise Fee"         = "^Franchise Fee$",
   "Elec Climate Tax"           = "^Climate Tax$",
   "Elec Sales Tax"             = "^Sales Tax$",
-  "Elec Total"                 = "^Total$",
+  #"Elec Total"                 = "^Total$",
   "Elec Premises Total"        = "^Premises Total$"
 )
 
@@ -144,7 +144,7 @@ resolve_total <- function(out, fuel_type) {
   if (fuel_type == "gas") {
     tk="Total"; pk="Premises Total"; sk="Subtotal"; fk="Franchise Fee"; ck="Climate Tax"; stk="Sales Tax"
   } else {
-    tk="Elec Total"; pk="Elec Premises Total"; sk="Elec Subtotal"
+    tk="Total"; pk="Elec Premises Total"; sk="Elec Subtotal"
     fk="Elec Franchise Fee"; ck="Elec Climate Tax"; stk="Elec Sales Tax"
   }
   expected <- sum(get_val(sk), get_val(fk), get_val(ck), get_val(stk), na.rm=TRUE)
@@ -310,7 +310,7 @@ ui <- fluidPage(
                  br(),
                  selectInput("elec_charges", "Select charges:",
                              choices  = unique(elec_data$Description),
-                             selected = c("Elec Total", "Distribution Demand", "Gen & Transm Demand"),
+                             selected = c("Total", "Distribution Demand", "Gen & Transm Demand"),
                              multiple = TRUE),
                  plotlyOutput("elecTrendPlot", height = "350px"),
                  br(),
@@ -453,10 +453,10 @@ server <- function(input, output, session) {
   })
   
   output$elec_total_plot <- renderPlotly({
-    df <- elec_store() %>% filter(Description == "Elec Total")
+    df <- elec_store() %>% filter(Description == "Total")
     validate(need(nrow(df)>0, "No electricity Total data yet."))
     ggplot(df, aes(bill_date, value)) +
-      geom_col(fill="#3a7ebf") +
+      geom_col(width = 20, fill="#3a7ebf") +
       scale_y_continuous(labels=dollar) +
       labs(title="Monthly Electricity Total", x=NULL, y="$") +
       theme_minimal(base_size=13)
@@ -464,11 +464,11 @@ server <- function(input, output, session) {
   
   output$combined_cost_plot <- renderPlotly({
     g <- gas_store()  %>% filter(Description == "Total") %>% mutate(fuel="Gas")
-    e <- elec_store() %>% filter(Description == "Elec Total") %>% mutate(fuel="Electricity")
+    e <- elec_store() %>% filter(Description == "Total") %>% mutate(fuel="Electricity")
     df <- bind_rows(g, e)
     validate(need(nrow(df)>0, "No data yet."))
     ggplot(df, aes(bill_date, value, fill=fuel)) +
-      geom_col(position="stack") +
+      geom_col(width=20, position="stack") +
       scale_fill_manual(values=c("Gas"="#e07b39","Electricity"="#3a7ebf")) +
       scale_y_continuous(labels=dollar) +
       labs(title="Combined Monthly Utility Cost", x=NULL, y="$", fill=NULL) +
