@@ -13,6 +13,7 @@ library(ggplot2)
 library(pdftools)
 library(stringr)
 library(scales)
+library(plotly)
 
 # ============================================================
 # 1. CONFIGURATION — paste your GitHub raw CSV URLs here
@@ -285,11 +286,11 @@ ui <- fluidPage(
         tabPanel("Overview",
                  br(),
                  fluidRow(
-                   column(6, plotOutput("gas_total_plot",  height = "300px")),
-                   column(6, plotOutput("elec_total_plot", height = "300px"))
+                   column(6, plotlyOutput("gas_total_plot",  height = "300px")),
+                   column(6, plotlyOutput("elec_total_plot", height = "300px"))
                  ),
                  br(),
-                 plotOutput("combined_cost_plot", height = "300px")
+                 plotlyOutput("combined_cost_plot", height = "300px")
         ),
         
         # ---- Gas Detail ----
@@ -299,7 +300,7 @@ ui <- fluidPage(
                              choices  = unique(gas_data$Description),
                              selected = c("Total", "Usage Charge", "Capacity Charge"),
                              multiple = TRUE),
-                 plotOutput("gasTrendPlot", height = "350px"),
+                 plotlyOutput("gasTrendPlot", height = "350px"),
                  br(),
                  tableOutput("gasSummaryTable")
         ),
@@ -311,7 +312,7 @@ ui <- fluidPage(
                              choices  = unique(elec_data$Description),
                              selected = c("Elec Total", "Distribution Demand", "Gen & Transm Demand"),
                              multiple = TRUE),
-                 plotOutput("elecTrendPlot", height = "350px"),
+                 plotlyOutput("elecTrendPlot", height = "350px"),
                  br(),
                  tableOutput("elecSummaryTable")
         ),
@@ -350,7 +351,7 @@ ui <- fluidPage(
                    )
                  ),
                  br(),
-                 plotOutput("electrification_plot", height = "350px")
+                 plotlyOutput("electrification_plot", height = "350px")
         ),
         
         # ---- Upload PDF ----
@@ -441,7 +442,7 @@ server <- function(input, output, session) {
   )
   
   # -- Overview plots --
-  output$gas_total_plot <- renderPlot({
+  output$gas_total_plot <- renderPlotly({
     df <- gas_store() %>% filter(Description == "Total")
     validate(need(nrow(df)>0, "No gas Total data yet."))
     ggplot(df, aes(bill_date, value)) +
@@ -451,7 +452,7 @@ server <- function(input, output, session) {
       theme_minimal(base_size=13)
   })
   
-  output$elec_total_plot <- renderPlot({
+  output$elec_total_plot <- renderPlotly({
     df <- elec_store() %>% filter(Description == "Elec Total")
     validate(need(nrow(df)>0, "No electricity Total data yet."))
     ggplot(df, aes(bill_date, value)) +
@@ -461,7 +462,7 @@ server <- function(input, output, session) {
       theme_minimal(base_size=13)
   })
   
-  output$combined_cost_plot <- renderPlot({
+  output$combined_cost_plot <- renderPlotly({
     g <- gas_store()  %>% filter(Description == "Total") %>% mutate(fuel="Gas")
     e <- elec_store() %>% filter(Description == "Elec Total") %>% mutate(fuel="Electricity")
     df <- bind_rows(g, e)
@@ -475,7 +476,7 @@ server <- function(input, output, session) {
   })
   
   # -- Gas detail --
-  output$gasTrendPlot <- renderPlot({
+  output$gasTrendPlot <- renderPlotly({
     df <- gas_store() %>%
       filter(Description %in% input$gas_charges,
              bill_date >= input$date_range[1], bill_date <= input$date_range[2])
@@ -495,7 +496,7 @@ server <- function(input, output, session) {
   })
   
   # -- Electricity detail --
-  output$elecTrendPlot <- renderPlot({
+  output$elecTrendPlot <- renderPlotly({
     df <- elec_store() %>%
       filter(Description %in% input$elec_charges,
              bill_date >= input$date_range[1], bill_date <= input$date_range[2])
@@ -573,7 +574,7 @@ server <- function(input, output, session) {
            dollar((svc_avg + cap_avg)*12), "/year) in Service & Capacity charges eliminated")
   })
   
-  output$electrification_plot <- renderPlot({
+  output$electrification_plot <- renderPlotly({
     r <- strain_results()
     svc <- gas_store() %>% filter(Description == "Service & Facility")
     cap <- gas_store() %>% filter(Description == "Capacity Charge")
