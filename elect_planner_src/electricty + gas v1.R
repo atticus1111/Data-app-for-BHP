@@ -19,7 +19,7 @@ library(plotly)
 # 1. CONFIGURATION — paste your GitHub raw CSV URLs here
 # ============================================================
 gas_csv_url  <- "https://raw.githubusercontent.com/atticus1111/Data-app-for-BHP/refs/heads/main/phpdata.csv"
-elec_csv_url <- "https://raw.githubusercontent.com/atticus1111/Data-app-for-BHP/refs/heads/main/phpdata.csv"  # can be same file or separate
+elec_csv_url <- "https://raw.githubusercontent.com/atticus1111/Data-app-for-BHP/main/Electricity_by_date.csv"  # can be same file or separate
 
 # ============================================================
 # 2. DATA LOADING
