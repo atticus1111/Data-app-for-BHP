@@ -26,6 +26,11 @@ library(stringr)
 library(scales)
 #library(writexl)
 
+# add deefault links 
+
+gas_csv_url  <- "https://raw.githubusercontent.com/atticus1111/Data-app-for-BHP/refs/heads/main/phpdata.csv"
+elec_csv_url <- "https://raw.githubusercontent.com/atticus1111/Data-app-for-BHP/main/Electricity_by_date.csv" 
+
 # ============================================================
 # 1. DATA LOADING
 # ============================================================
@@ -396,8 +401,8 @@ ui <- fluidPage(
                "and just upload PDFs. Links you paste here are only used ",
                "in your own browser session -- nobody else using this app ",
                "sees them or your data."),
-      textInput("gas_csv_url",  "Gas CSV URL",         placeholder = "https://..."),
-      textInput("elec_csv_url", "Electricity CSV URL", placeholder = "https://... (optional, can match gas URL)"),
+      textInput("gas_csv_url",  "Gas CSV URL",         placeholder = "https://raw.githubusercontent.com/atticus1111/Data-app-for-BHP/refs/heads/main/phpdata.csv"),
+      textInput("elec_csv_url", "Electricity CSV URL", placeholder = "elec_csv_url"),
       actionButton("load_csv_btn", "Load CSV link(s)", class = "btn-secondary"),
       hr(),
       h5("Filters"),
@@ -527,8 +532,8 @@ server <- function(input, output, session) {
   elec_store <- reactiveVal(empty_bill_df())
 
   # -- Load optional CSV links, entered at runtime --
-  observeEvent(input$load_csv_btn, {
-    gas_new  <- load_bill_data(input$gas_csv_url,  "gas CSV")
+  observeEvent(input$gas_csv_url, {
+   gas_new  <- load_bill_data(input$gas_csv_url,  "gas CSV")
     elec_new <- load_bill_data(input$elec_csv_url, "electricity CSV")
 
     n_added <- 0
