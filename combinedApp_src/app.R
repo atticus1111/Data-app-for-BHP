@@ -26,11 +26,6 @@ library(stringr)
 library(scales)
 #library(writexl)
 
-# add deefault links 
-
-gas_csv_url  <- "https://raw.githubusercontent.com/atticus1111/Data-app-for-BHP/refs/heads/main/phpdata.csv"
-elec_csv_url <- "https://raw.githubusercontent.com/atticus1111/Data-app-for-BHP/main/Electricity_by_date.csv" 
-
 # ============================================================
 # 1. DATA LOADING
 # ============================================================
@@ -70,10 +65,10 @@ load_bill_data <- function(url, label = "data") {
         bill_date = mdy(trimws(bill_date)),
         value     = suppressWarnings(as.numeric(value))
       ) %>%
-      filter(!is.na(bill_date), !is.na(value)) %>%
+      filter(!is.na(bill_date), !is.na(value)) # %>%
       # Bills are grouped by billing month -- different exact dates within
       # the same month (e.g. 3/14 vs 3/17) represent the same billing period
-      mutate(bill_date = floor_date(bill_date, "month"))
+     # mutate(bill_date = floor_date(bill_date, "month"))
   }, error = function(e) {
     message("Could not load ", label, ": ", e$message)
     empty_bill_df()
@@ -401,8 +396,8 @@ ui <- fluidPage(
                "and just upload PDFs. Links you paste here are only used ",
                "in your own browser session -- nobody else using this app ",
                "sees them or your data."),
-      textInput("gas_csv_url",  "Gas CSV URL",         placeholder = "https://raw.githubusercontent.com/atticus1111/Data-app-for-BHP/refs/heads/main/phpdata.csv"),
-      textInput("elec_csv_url", "Electricity CSV URL", placeholder = "elec_csv_url"),
+      textInput("gas_csv_url",  "Gas CSV URL",         value = "https://raw.githubusercontent.com/atticus1111/Data-app-for-BHP/refs/heads/main/phpdata.csv"),
+      textInput("elec_csv_url", "Electricity CSV URL", value = "https://raw.githubusercontent.com/atticus1111/Data-app-for-BHP/main/Electricity_by_date.csv"),
       actionButton("load_csv_btn", "Load CSV link(s)", class = "btn-secondary"),
       hr(),
       h5("Filters"),
@@ -713,22 +708,25 @@ server <- function(input, output, session) {
   })
 
   output$elec_total_plot <- renderPlot({
-    df <- elec_store() %>% filter(Description == "Elec Total")
+    df <- elec_store() 
+    #%>% filter(Description == "Elec Total") 
     validate(need(nrow(df)>0, "No electricity Total data yet."))
     ggplot(df, aes(bill_date, value)) +
-      geom_col(fill="#3a7ebf") +
+      geom_col(width = 20,fill="#3a7ebf") +
       scale_y_continuous(labels=dollar) +
       labs(title="Monthly Electricity Total", x=NULL, y="$") +
       theme_minimal(base_size=13)
   })
 
+  
   output$combined_cost_plot <- renderPlot({
     g <- gas_store()  %>% filter(Description == "Total") %>% mutate(fuel="Gas")
-    e <- elec_store() %>% filter(Description == "Elec Total") %>% mutate(fuel="Electricity")
+    e <- elec_store()  %>% mutate(fuel="Electricity")
+      #filter(Description == "Elec Total") 
     df <- bind_rows(g, e)
     validate(need(nrow(df)>0, "No data yet."))
     ggplot(df, aes(bill_date, value, fill=fuel)) +
-      geom_col(position="stack") +
+      geom_col(width=15, position="stack") +
       scale_fill_manual(values=c("Gas"="#e07b39","Electricity"="#3a7ebf")) +
       scale_y_continuous(labels=dollar) +
       labs(title="Combined Monthly Utility Cost", x=NULL, y="$", fill=NULL) +
