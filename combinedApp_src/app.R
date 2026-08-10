@@ -24,7 +24,7 @@ library(ggplot2)
 library(pdftools)
 library(stringr)
 library(scales)
-#library(writexl)
+library(writexl)
 
 # ============================================================
 # 1. DATA LOADING
