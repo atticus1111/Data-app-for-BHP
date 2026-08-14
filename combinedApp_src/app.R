@@ -21,6 +21,7 @@ library(tidyr)
 library(readr)
 library(lubridate)
 library(ggplot2)
+library(plotly)
 library(pdftools)
 library(stringr)
 library(scales)
@@ -45,11 +46,11 @@ merge_bill_data <- function(old, new) {
     arrange(bill_date)
 }
 
-# url is optional -- if blank/NULL, just returns an empty data frame
-load_bill_data <- function(url, label = "data") {
-  if (is.null(url) || !nzchar(trimws(url))) return(empty_bill_df())
+# path is optional -- if blank/NULL, just returns an empty data frame
+load_bill_data <- function(path, label = "data") {
+  if (is.null(path) || !nzchar(trimws(path))) return(empty_bill_df())
   tryCatch({
-    raw <- read_csv(url, show_col_types = FALSE)
+    raw <- read_csv(path, show_col_types = FALSE)
     raw <- raw %>% select(where(~ !all(is.na(.))))
     raw <- raw[, !grepl("^\\.\\.\\.+|^$|^NA$", names(raw))]
 
@@ -392,13 +393,14 @@ ui <- fluidPage(
     sidebarPanel(
       width = 3,
       h5("Data source (optional)"),
-      helpText("Paste your own gas/electric CSV links below, or skip this ",
-               "and just upload PDFs. Links you paste here are only used ",
-               "in your own browser session -- nobody else using this app ",
-               "sees them or your data."),
-      textInput("gas_csv_url",  "Gas CSV URL",         value = "https://raw.githubusercontent.com/atticus1111/Data-app-for-BHP/refs/heads/main/phpdata.csv"),
-      textInput("elec_csv_url", "Electricity CSV URL", value = "https://raw.githubusercontent.com/atticus1111/Data-app-for-BHP/main/Electricity_by_date.csv"),
-      actionButton("load_csv_btn", "Load CSV link(s)", class = "btn-secondary"),
+      helpText("Upload your own gas/electric CSV files below, or skip this ",
+               "and just upload PDFs. CSV files are only used in your own ",
+               "browser session."),
+      fileInput("gas_csv_file", "Gas CSV file", accept = ".csv", multiple = FALSE,
+                buttonLabel = "Choose gas CSV"),
+      fileInput("elec_csv_file", "Electricity CSV file", accept = ".csv", multiple = FALSE,
+                buttonLabel = "Choose electricity CSV"),
+      actionButton("load_csv_btn", "Load CSV file(s)", class = "btn-secondary"),
       hr(),
       h5("Filters"),
       selectInput("fuel_filter", "Fuel type:",
@@ -425,11 +427,11 @@ ui <- fluidPage(
         tabPanel("Overview",
                  br(),
                  fluidRow(
-                   column(6, plotOutput("gas_total_plot",  height = "300px")),
-                   column(6, plotOutput("elec_total_plot", height = "300px"))
+                   column(6, plotlyOutput("gas_total_plot",  height = "300px")),
+                   column(6, plotlyOutput("elec_total_plot", height = "300px"))
                  ),
                  br(),
-                 plotOutput("combined_cost_plot", height = "300px")
+                 plotlyOutput("combined_cost_plot", height = "300px")
         ),
 
         # ---- Gas Detail ----
@@ -438,7 +440,7 @@ ui <- fluidPage(
                  selectInput("gas_charges", "Select charges:",
                              choices  = NULL,
                              multiple = TRUE),
-                 plotOutput("gasTrendPlot", height = "350px"),
+                 plotlyOutput("gasTrendPlot", height = "350px"),
                  br(),
                  tableOutput("gasSummaryTable")
         ),
@@ -449,7 +451,7 @@ ui <- fluidPage(
                  selectInput("elec_charges", "Select charges:",
                              choices  = NULL,
                              multiple = TRUE),
-                 plotOutput("elecTrendPlot", height = "350px"),
+                 plotlyOutput("elecTrendPlot", height = "350px"),
                  br(),
                  tableOutput("elecSummaryTable")
         ),
@@ -488,7 +490,7 @@ ui <- fluidPage(
                    )
                  ),
                  br(),
-                 plotOutput("electrification_plot", height = "350px")
+                   plotlyOutput("electrification_plot", height = "350px")
         ),
 
         # ---- Upload PDF ----
@@ -501,7 +503,7 @@ ui <- fluidPage(
                  actionButton("add_pdf_data", "Add to my data", class = "btn-primary"),
                  hr(),
                  h5("Download compiled data"),
-                 helpText("Downloads everything currently in your session (from CSV links and/or PDFs you've added above)."),
+                 helpText("Downloads everything currently in your session (from uploaded CSV files and/or PDFs you've added above)."),
                  downloadButton("download_xlsx", "Download Excel (all data, .xlsx)", class = "btn-success"),
                  br(), br(),
                  downloadButton("download_gas",  "Download gas CSV"),
@@ -526,10 +528,13 @@ server <- function(input, output, session) {
   gas_store  <- reactiveVal(empty_bill_df())
   elec_store <- reactiveVal(empty_bill_df())
 
-  # -- Load optional CSV links, entered at runtime --
-  observeEvent(input$gas_csv_url, {
-   gas_new  <- load_bill_data(input$gas_csv_url,  "gas CSV")
-    elec_new <- load_bill_data(input$elec_csv_url, "electricity CSV")
+  # -- Load optional CSV files, uploaded at runtime --
+  observeEvent(input$load_csv_btn, {
+    gas_path <- if (!is.null(input$gas_csv_file) && nrow(input$gas_csv_file) > 0) input$gas_csv_file$datapath[1] else NULL
+    elec_path <- if (!is.null(input$elec_csv_file) && nrow(input$elec_csv_file) > 0) input$elec_csv_file$datapath[1] else NULL
+
+    gas_new  <- load_bill_data(gas_path, "gas CSV")
+    elec_new <- load_bill_data(elec_path, "electricity CSV")
 
     n_added <- 0
     if (nrow(gas_new) > 0) {
@@ -542,14 +547,14 @@ server <- function(input, output, session) {
     }
 
     if (n_added == 0) {
-      showNotification("No data loaded -- check the URL(s) and that the CSV has a 'Description' column.", type = "warning")
+      showNotification("No data loaded. Upload at least one CSV file with a 'Description' column and bill date columns.", type = "warning")
     } else {
-      showNotification(paste0("Loaded ", n_added, " rows from CSV link(s)."), type = "message")
+      showNotification(paste0("Loaded ", n_added, " rows from CSV file(s)."), type = "message")
     }
   })
 
   # -- Keep charge-selector choices and date range in sync with whatever
-  #    data is currently in the store (from CSV links and/or PDFs) --
+  #    data is currently in the store (from uploaded CSV files and/or PDFs) --
   observe({
     gs <- gas_store()
     choices <- unique(gs$Description)
@@ -697,54 +702,58 @@ server <- function(input, output, session) {
   )
 
   # -- Overview plots --
-  output$gas_total_plot <- renderPlot({
+  output$gas_total_plot <- renderPlotly({
     df <- gas_store() %>% filter(Description == "Total")
     validate(need(nrow(df)>0, "No gas Total data yet."))
-    ggplot(df, aes(bill_date, value)) +
+    p <- ggplot(df, aes(bill_date, value)) +
       geom_col(fill="#e07b39") +
       scale_y_continuous(labels=dollar) +
       labs(title="Monthly Gas Total", x=NULL, y="$") +
       theme_minimal(base_size=13)
+    ggplotly(p)
   })
 
-  output$elec_total_plot <- renderPlot({
+  output$elec_total_plot <- renderPlotly({
     df <- elec_store() 
     #%>% filter(Description == "Elec Total") 
     validate(need(nrow(df)>0, "No electricity Total data yet."))
-    ggplot(df, aes(bill_date, value)) +
+    p <- ggplot(df, aes(bill_date, value)) +
       geom_col(width = 20,fill="#3a7ebf") +
       scale_y_continuous(labels=dollar) +
       labs(title="Monthly Electricity Total", x=NULL, y="$") +
       theme_minimal(base_size=13)
+    ggplotly(p)
   })
 
   
-  output$combined_cost_plot <- renderPlot({
+  output$combined_cost_plot <- renderPlotly({
     g <- gas_store()  %>% filter(Description == "Total") %>% mutate(fuel="Gas")
     e <- elec_store()  %>% mutate(fuel="Electricity")
       #filter(Description == "Elec Total") 
     df <- bind_rows(g, e)
     validate(need(nrow(df)>0, "No data yet."))
-    ggplot(df, aes(bill_date, value, fill=fuel)) +
+    p <- ggplot(df, aes(bill_date, value, fill=fuel)) +
       geom_col(width=15, position="stack") +
       scale_fill_manual(values=c("Gas"="#e07b39","Electricity"="#3a7ebf")) +
       scale_y_continuous(labels=dollar) +
       labs(title="Combined Monthly Utility Cost", x=NULL, y="$", fill=NULL) +
       theme_minimal(base_size=13)
+    ggplotly(p)
   })
 
   # -- Gas detail --
-  output$gasTrendPlot <- renderPlot({
+  output$gasTrendPlot <- renderPlotly({
     req(input$gas_charges)
     df <- gas_store() %>%
       filter(Description %in% input$gas_charges,
              bill_date >= input$date_range[1], bill_date <= input$date_range[2])
     validate(need(nrow(df)>0, "No data for selection."))
-    ggplot(df, aes(bill_date, value, color=Description)) +
+    p <- ggplot(df, aes(bill_date, value, color=Description)) +
       geom_line(linewidth=1) + geom_point(size=2) +
       scale_y_continuous(labels=dollar) +
       labs(x=NULL, y="$", color=NULL, title="Gas charges over time") +
       theme_minimal(base_size=13)
+    ggplotly(p)
   })
 
   output$gasSummaryTable <- renderTable({
@@ -756,17 +765,18 @@ server <- function(input, output, session) {
   })
 
   # -- Electricity detail --
-  output$elecTrendPlot <- renderPlot({
+  output$elecTrendPlot <- renderPlotly({
     req(input$elec_charges)
     df <- elec_store() %>%
       filter(Description %in% input$elec_charges,
              bill_date >= input$date_range[1], bill_date <= input$date_range[2])
     validate(need(nrow(df)>0, "No data for selection."))
-    ggplot(df, aes(bill_date, value, color=Description)) +
+    p <- ggplot(df, aes(bill_date, value, color=Description)) +
       geom_line(linewidth=1) + geom_point(size=2) +
       scale_y_continuous(labels=dollar) +
       labs(x=NULL, y="$", color=NULL, title="Electricity charges over time") +
       theme_minimal(base_size=13)
+    ggplotly(p)
   })
 
   output$elecSummaryTable <- renderTable({
@@ -833,7 +843,7 @@ server <- function(input, output, session) {
            dollar((svc_avg + cap_avg)*12), "/year) in Service & Capacity charges eliminated")
   })
 
-  output$electrification_plot <- renderPlot({
+  output$electrification_plot <- renderPlotly({
     r <- strain_results()
     svc <- gas_store() %>% filter(Description == "Service & Facility")
     cap <- gas_store() %>% filter(Description == "Capacity Charge")
@@ -858,13 +868,14 @@ server <- function(input, output, session) {
       Color    = c("Savings","Savings","New cost")
     )
 
-    ggplot(bar_df, aes(Category, Value, fill=Color)) +
+    p <- ggplot(bar_df, aes(Category, Value, fill=Color)) +
       geom_col(width=0.6) +
       scale_fill_manual(values=c("Savings"="#4caf50","New cost"="#3a7ebf")) +
       scale_y_continuous(labels=dollar) +
       labs(title=title_str, x=NULL, y="$/month", fill=NULL,
            caption="Based on monthly averages. Actual results will vary by season, equipment, and rate changes.") +
       theme_minimal(base_size=13)
+    ggplotly(p)
   })
 }
 
